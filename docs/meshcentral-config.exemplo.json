@@ -1,0 +1,35 @@
+{
+  "settings": {
+    "cert": "remoto.suaempresa.com.br",
+    "port": 9443,
+    "aliasPort": 9443,
+    "redirPort": 0,
+    "mpsPort": 0,
+    "WANonly": true,
+    "selfUpdate": false,
+    "loginCookieEncryptionKey": "<160 caracteres hex: a mesma do mesh.loginTokenKey do painel>",
+    "autoBackup": {
+      "backupIntervalHours": 24,
+      "keepLastDaysBackup": 30,
+      "backupPath": "../backups/meshcentral"
+    }
+  },
+  "domains": {
+    "": {
+      "title": "PainelRemoto",
+      "newAccounts": false,
+      "userConsentFlags": 64,
+      "userNameIsEmail": false,
+      "loginKey": ["<so letras e numeros: a mesma do mesh.loginKey do painel>"],
+      "consentMessages": {
+        "title": "Acesso remoto - TI",
+        "desktop": "{0}, do TI, está pedindo para acessar a sua tela. Permitir?",
+        "terminal": "{0}, do TI, está pedindo para acessar o terminal deste computador. Permitir?",
+        "files": "{0}, do TI, está pedindo para acessar os arquivos deste computador. Permitir?",
+        "consentTimeout": 60,
+        "autoAcceptOnTimeout": false,
+        "autoAcceptIfNoUser": true
+      }
+    }
+  }
+}

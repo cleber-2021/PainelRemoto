@@ -1,0 +1,23 @@
+{
+  "nome": "PainelRemoto",
+  "porta": 4500,
+  "host": "0.0.0.0",
+  "sessaoHoras": 10,
+  "exigir2fa": true,
+  "confiarDias": 30,
+  "ad": false,
+  "https": {
+    "cert": "certs/fullchain.pem",
+    "key": "certs/privkey.pem"
+  },
+  "backup": { "pasta": "data/backups", "dias": 30 },
+  "mesh": {
+    "url": "https://127.0.0.1:9443",
+    "servername": "remoto.suaempresa.com.br",
+    "urlPublica": "https://remoto.suaempresa.com.br:9443",
+    "user": "<usuario de servico do MeshCentral>",
+    "loginTokenKey": "<mesma loginCookieEncryptionKey do config.json do MeshCentral (160 hex)>",
+    "loginKey": "<mesma loginKey do dominio no MeshCentral (so letras e numeros)>",
+    "syncSegundos": 15
+  }
+}

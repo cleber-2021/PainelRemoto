@@ -1,0 +1,9 @@
+node_modules/
+data/
+certs/
+config.json
+*.log
+*.db
+*.db-wal
+*.db-shm
+implantacao/instaladores/

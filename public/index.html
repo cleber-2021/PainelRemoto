@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PainelRemoto</title>
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233b82f6'/%3E%3Cstop offset='1' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M8 10h16v10H8zM13 24h6M16 20v4' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>
+    // Aplica o tema antes de desenhar a pagina (evita piscar claro->escuro)
+    (function () { var t = 'auto'; try { t = localStorage.getItem('painel.tema') || 'auto'; } catch (e) {}
+      if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t); })();
+  </script>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <!-- Icones -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-tela" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M3 4h18v12H3zM8 20h8M12 16v4"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 17l6-5-6-5M12 19h8"/></symbol>
+    <symbol id="i-pasta" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-editar" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></symbol>
+    <symbol id="i-mais" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
+    <symbol id="i-marca" viewBox="0 0 32 32"><defs><linearGradient id="grad-marca" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#grad-marca)"/><path d="M8 10h16v10H8zM13 24h6M16 20v4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sol" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g></symbol>
+    <symbol id="i-lua" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></g></symbol>
+    <symbol id="i-sair" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></symbol>
+    <symbol id="i-busca" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></g></symbol>
+    <symbol id="i-permissao" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M3 20v-1a6 6 0 0 1 9.5-4.9M16 17l2 2 4-4"/></g></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
+  </svg>
+
+  <!-- Login / primeiro acesso -->
+  <section id="tela-entrada" class="entrada" hidden>
+    <button class="icone botao-tema tema-entrada" data-tema-botao title="Tema"><svg><use href="#i-auto"/></svg></button>
+    <form id="form-entrada" class="cartao-entrada">
+      <div class="marca"><span class="marca-icone"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#i-marca"/></svg></span> PainelRemoto</div>
+      <p id="entrada-sub" class="sub">Entre com seu usuário do painel.</p>
+      <label id="campo-nome" hidden>Nome<input name="nome" autocomplete="name"></label>
+      <label>Login<input name="login" autocomplete="username" required></label>
+      <label>Senha<input name="senha" type="password" autocomplete="current-password" required></label>
+      <p id="entrada-erro" class="erro" hidden></p>
+      <button class="btn primario" type="submit" id="entrada-btn">Entrar</button>
+    </form>
+
+    <!-- Segunda etapa: codigo do aplicativo autenticador (e cadastro do app no primeiro login) -->
+    <form id="form-codigo" class="cartao-entrada" hidden>
+      <div class="marca"><span class="marca-icone"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#i-marca"/></svg></span> PainelRemoto</div>
+      <div id="cadastro-2fa" hidden>
+        <p class="sub"><b>Ative a verificação em duas etapas.</b> Ela é obrigatória para entrar no painel.</p>
+        <ol class="passos">
+          <li>Instale no celular o <b>Google Authenticator</b> ou o <b>Microsoft Authenticator</b>.</li>
+          <li>No aplicativo, toque em <b>+</b> e leia este QR code:</li>
+        </ol>
+        <div class="qr" id="qr-2fa"></div>
+        <p class="nota">Sem câmera? Digite a chave no aplicativo: <code id="segredo-2fa"></code></p>
+        <ol class="passos" start="3"><li>Digite abaixo o código de 6 dígitos que aparecer no aplicativo.</li></ol>
+      </div>
+      <p class="sub" id="instrucao-codigo">Digite o código de 6 dígitos do seu aplicativo autenticador.</p>
+      <label>Código<input name="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="7" pattern="[0-9 ]*" required></label>
+      <label class="check confiar"><input type="checkbox" name="confiar"> <span>Confiar neste computador por <span id="dias-confiar">30</span> dias<br><small>Não marque em computador compartilhado ou público.</small></span></label>
+      <p id="codigo-erro" class="erro" hidden></p>
+      <button class="btn primario" type="submit">Confirmar</button>
+      <button class="btn fantasma" type="button" id="btn-voltar-login">Voltar</button>
+    </form>
+  </section>
+
+  <!-- Aplicacao -->
+  <div id="app" hidden>
+    <header class="topo">
+      <div class="marca"><span class="marca-icone"><svg viewBox="0 0 32 32" aria-hidden="true"><use href="#i-marca"/></svg></span> PainelRemoto</div>
+      <nav id="abas" class="abas">
+        <button data-aba="maquinas" class="ativa">Máquinas</button>
+        <button data-aba="historico" data-admin>Histórico</button>
+        <button data-aba="usuarios" data-admin>Usuários</button>
+      </nav>
+      <div class="usuario">
+        <button class="icone botao-tema" data-tema-botao title="Tema"><svg><use href="#i-auto"/></svg></button>
+        <span class="avatar" id="usuario-avatar"></span>
+        <span class="usuario-nome" id="usuario-nome"></span>
+        <button id="btn-sair" class="icone" title="Sair"><svg><use href="#i-sair"/></svg></button>
+      </div>
+    </header>
+
+    <!-- Maquinas -->
+    <div data-pagina="maquinas" class="layout-maq">
+      <aside class="lateral">
+        <nav class="lat-filtros" id="lat-filtros">
+          <button data-filtro="todas">Todas <span class="cont" id="c-todas"></span></button>
+          <button data-filtro="online"><span class="ponto on"></span>Online <span class="cont" id="c-online"></span></button>
+          <button data-filtro="offline"><span class="ponto"></span>Offline <span class="cont" id="c-offline"></span></button>
+          <button data-filtro="semcadastro">Sem cadastro <span class="cont alerta" id="c-semcadastro"></span></button>
+          <button data-filtro="foradominio" id="f-foradominio" hidden title="Máquinas cujo nome não existe no AD (ex.: VMs de análise do antivírus)">Fora do domínio <span class="cont perigo" id="c-foradominio"></span></button>
+        </nav>
+        <div class="lat-titulo">
+          <span>Grupos</span>
+          <button class="icone" id="btn-novo-grupo" title="Novo grupo" data-admin><svg><use href="#i-add"/></svg></button>
+        </div>
+        <ul class="lat-grupos" id="lat-grupos"></ul>
+        <p class="lat-dica">A máquina entra no grupo do instalador usado. Para trocar, use Editar ou selecione várias e clique em Mover.</p>
+      </aside>
+
+      <section class="conteudo">
+        <div id="aviso-mesh" class="aviso" hidden></div>
+        <div class="cab-lista">
+          <div>
+            <h2 id="titulo-lista">Todas as máquinas</h2>
+            <div class="resumo" id="resumo"></div>
+          </div>
+          <button class="btn fantasma pequeno" id="btn-instalador" hidden><svg class="ico"><use href="#i-add"/></svg>Baixar instalador deste grupo</button>
+        </div>
+        <div class="barra">
+          <div class="campo-busca"><svg><use href="#i-busca"/></svg><input id="busca" type="search" placeholder="Buscar em todas as máquinas: nome, IP, cliente, setor, responsável…" autocomplete="off"><kbd class="atalho" title="Atalho: / ou Ctrl+K">/</kbd></div>
+          <select id="filtro-cliente"><option value="">Todos os clientes</option></select>
+        </div>
+
+        <div class="escopo-busca" id="escopo-busca" hidden></div>
+
+        <div class="massa" id="massa" hidden>
+          <span id="massa-qtd"></span>
+          <select id="massa-grupo"></select>
+          <button class="btn primario pequeno" id="massa-mover">Mover</button>
+          <span class="massa-sep"></span>
+          <button class="btn fantasma pequeno" id="massa-pedir" title="Usuário precisa autorizar o acesso"><svg class="ico"><use href="#i-permissao"/></svg>Pedir permissão</button>
+          <button class="btn fantasma pequeno" id="massa-direto" title="Acesso sem pedir autorização">Acesso direto</button>
+          <span class="massa-sep"></span>
+          <button class="btn perigo pequeno" id="massa-excluir" title="Exclui as selecionadas que estiverem offline">Excluir offline</button>
+          <button class="btn fantasma pequeno" id="massa-limpar">Limpar seleção</button>
+        </div>
+
+        <div class="tabela-wrap">
+          <table class="tabela tab-maq">
+            <thead>
+              <tr>
+                <th class="col-chk" data-admin><input type="checkbox" id="chk-todas" title="Selecionar a página"></th>
+                <th class="col-st" data-ordem="online" title="Status"></th>
+                <th data-ordem="nome">Nome</th>
+                <th class="col-grupo" data-ordem="grupo">Grupo</th>
+                <th class="col-cliente" data-ordem="cliente">Cliente</th>
+                <th class="col-local" data-ordem="local">Local / Setor</th>
+                <th class="col-resp" data-ordem="responsavel">Responsável</th>
+                <th class="col-ip" data-ordem="ip">IP</th>
+                <th class="col-os" data-ordem="os">Sistema</th>
+                <th class="col-visto" data-ordem="visto">Visto</th>
+                <th class="col-acoes"></th>
+              </tr>
+            </thead>
+            <tbody id="lista-maquinas"></tbody>
+          </table>
+        </div>
+        <div class="paginacao" id="paginacao"></div>
+      </section>
+    </div>
+
+    <!-- Historico -->
+    <main data-pagina="historico" hidden>
+      <div class="titulo-acao">
+        <div><h2>Histórico de acessos</h2><div class="resumo" id="hist-resumo"></div></div>
+        <a class="btn fantasma pequeno" id="hist-csv" href="#" download>Exportar CSV</a>
+      </div>
+      <form class="filtros-hist" id="filtros-hist" autocomplete="off">
+        <label>Usuário<select name="usuario"><option value="">Todos</option></select></label>
+        <label>Máquina<input name="maquina" type="search" placeholder="Nome da máquina"></label>
+        <label>Ação
+          <select name="modo">
+            <option value="">Todas</option>
+            <option value="desktop">Tela remota</option>
+            <option value="terminal">Terminal</option>
+            <option value="arquivos">Arquivos</option>
+            <option value="permissao">Mudança de permissão</option>
+            <option value="exclusao">Máquina excluída</option>
+            <option value="instalador">Download de instalador</option>
+          </select>
+        </label>
+        <label>De<input name="de" type="date"></label>
+        <label>Até<input name="ate" type="date"></label>
+        <div class="atalhos-data">
+          <button type="button" class="btn fantasma pequeno" data-periodo="0">Hoje</button>
+          <button type="button" class="btn fantasma pequeno" data-periodo="6">7 dias</button>
+          <button type="button" class="btn fantasma pequeno" data-periodo="29">30 dias</button>
+          <button type="button" class="btn fantasma pequeno" id="hist-limpar">Limpar</button>
+        </div>
+      </form>
+      <div class="tabela-wrap"><table class="tabela tab-hist">
+        <thead><tr><th>Data / hora</th><th>Usuário</th><th>Máquina</th><th>Ação</th><th>IP de origem</th></tr></thead>
+        <tbody id="lista-acessos"></tbody>
+      </table></div>
+      <div class="paginacao" id="hist-paginacao"></div>
+    </main>
+
+    <!-- Usuarios -->
+    <main data-pagina="usuarios" hidden>
+      <div class="titulo-acao">
+        <h2>Usuários do painel</h2>
+        <button class="btn primario" id="btn-novo-usuario">Novo usuário</button>
+      </div>
+      <div class="tabela-wrap"><table class="tabela">
+        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Grupos</th><th>2 etapas</th><th>Situação</th><th></th></tr></thead>
+        <tbody id="lista-usuarios"></tbody>
+      </table></div>
+    </main>
+  </div>
+
+  <!-- Menu do grupo -->
+  <div class="menu" id="menu-grupo" hidden>
+    <button data-menu="instalador">Baixar instalador</button>
+    <button data-menu="editar">Renomear</button>
+    <button data-menu="excluir" class="perigo">Excluir grupo</button>
+  </div>
+
+  <!-- Modal grupo -->
+  <dialog id="modal-grupo">
+    <form method="dialog" id="form-grupo">
+      <h3 id="grupo-titulo">Novo grupo</h3>
+      <p class="sub">Use um grupo por cliente ou unidade. Cada grupo tem o próprio instalador.</p>
+      <div class="grade-form">
+        <label class="largo">Nome<input name="nome" required maxlength="128"></label>
+        <label class="largo">Descrição<input name="descricao" maxlength="1000"></label>
+      </div>
+      <p class="erro" id="grupo-erro" hidden></p>
+      <div class="acoes-modal">
+        <span class="espaco"></span>
+        <button class="btn fantasma" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn primario" value="salvar">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal editar maquina -->
+  <dialog id="modal-maquina">
+    <form method="dialog" id="form-maquina">
+      <h3>Cadastro da máquina</h3>
+      <p class="sub" id="maquina-info"></p>
+      <div class="grade-form">
+        <label>Nome no painel<input name="apelido" placeholder="Vazio = nome do Windows"></label>
+        <label>Grupo<select name="grupo"></select></label>
+        <label>Cliente<input name="cliente" list="sugestoes-cliente"></label>
+        <label>Local / posto<input name="local" list="sugestoes-local"></label>
+        <label>Setor<input name="setor" list="sugestoes-setor"></label>
+        <label>Responsável<input name="responsavel"></label>
+        <label>Patrimônio<input name="patrimonio"></label>
+        <label class="largo">Observação<textarea name="observacao" rows="3"></textarea></label>
+        <label class="check largo caixa-permissao"><input type="checkbox" name="pedirPermissao"> <span><b>Pedir permissão ao usuário antes de acessar</b><br><small>Quem estiver no computador precisa clicar em "Permitir" (tela, terminal e arquivos). Se ninguém estiver logado, o acesso é direto.</small></span></label>
+      </div>
+      <datalist id="sugestoes-cliente"></datalist>
+      <datalist id="sugestoes-local"></datalist>
+      <datalist id="sugestoes-setor"></datalist>
+      <p class="nota" id="maquina-nota-excluir" hidden>Para excluir esta máquina, desinstale o agente nela primeiro. O botão de excluir aparece quando ela fica offline.</p>
+      <p class="erro" id="maquina-erro" hidden></p>
+      <div class="acoes-modal">
+        <button class="btn perigo" value="remover" id="btn-remover-maquina" hidden>Excluir máquina</button>
+        <span class="espaco"></span>
+        <button class="btn fantasma" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn primario" value="salvar">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal usuario -->
+  <dialog id="modal-usuario">
+    <form method="dialog" id="form-usuario">
+      <h3 id="usuario-titulo">Novo usuário</h3>
+      <div class="grade-form">
+        <label>Nome<input name="nome" required></label>
+        <label>Login<input name="login" required></label>
+        <label>Senha<input name="senha" type="password" autocomplete="new-password"></label>
+        <label>Perfil
+          <select name="perfil">
+            <option value="tecnico">Técnico (só acessa)</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </label>
+        <label class="check" id="campo-ativo"><input type="checkbox" name="ativo" checked> Ativo</label>
+      </div>
+      <fieldset class="grupos-usuario" id="campo-grupos">
+        <legend>Grupos que este técnico pode acessar</legend>
+        <div id="lista-grupos-usuario"></div>
+      </fieldset>
+      <p class="nota" id="nota-admin-grupos" hidden>Administradores acessam todos os grupos.</p>
+      <div class="linha-2fa" id="campo-2fa" hidden>
+        <span id="status-2fa"></span>
+        <label class="check"><input type="checkbox" name="redefinir2fa"> Redefinir (a pessoa cadastra o app de novo no próximo login)</label>
+        <label class="check" id="campo-esquecer"><input type="checkbox" name="esquecerComputadores"> <span id="texto-esquecer"></span></label>
+      </div>
+      <p class="erro" id="usuario-erro" hidden></p>
+      <div class="acoes-modal">
+        <span class="espaco"></span>
+        <button class="btn fantasma" value="cancelar" formnovalidate>Cancelar</button>
+        <button class="btn primario" value="salvar">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

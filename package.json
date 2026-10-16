@@ -1,0 +1,27 @@
+{
+  "name": "painelremoto",
+  "version": "1.0.0",
+  "description": "Painel web de gestão de acesso remoto para parques Windows, usando o MeshCentral como motor",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "meshcentral",
+    "acesso-remoto",
+    "remote-desktop",
+    "helpdesk",
+    "totp"
+  ],
+  "author": "Cleber Rocha",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.22.3",
+    "qrcode-generator": "^1.4.4",
+    "ws": "^8.22.0"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
