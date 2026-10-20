@@ -454,9 +454,14 @@ dialog form { padding: 24px; }
 /* ============================================================
    Responsivo
    ============================================================ */
-@media (max-width: 1560px) { .col-os { display: none; } }
-@media (max-width: 1300px) { .col-mac, .col-visto { display: none; } }
-@media (max-width: 1080px) { .col-ip, .col-grupo { display: none; } .usuario-nome { display: none; } }
+/* Colunas somem da menos para a mais importante, para a tabela caber sem rolagem lateral */
+@media (max-width: 1760px) { .col-os { display: none; } }
+@media (max-width: 1640px) { .col-visto { display: none; } }
+@media (max-width: 1500px) { .col-mac { display: none; } }
+@media (max-width: 1340px) { .col-grupo { display: none; } }
+@media (max-width: 1180px) { .col-ip { display: none; } .usuario-nome { display: none; } }
+@media (max-width: 1040px) { .col-usuario { display: none; } }
+@media (max-width: 940px) { .col-local { display: none; } }
 
 @media (max-width: 760px) {
   .topo { flex-wrap: wrap; height: auto; padding: 10px 16px 8px; gap: 6px 16px; position: static; }

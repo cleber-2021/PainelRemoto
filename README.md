@@ -10,6 +10,18 @@ autenticação em duas etapas e uma experiência de uso simplificada para a equi
 
 > Desenvolvido e usado em produção num parque com centenas de estações Windows 10/11, dentro e fora do domínio.
 
+![Lista de máquinas no tema escuro](docs/img/maquinas-escuro.png)
+
+<sub>Todas as telas usam dados fictícios.</sub>
+
+## Telas
+
+| | |
+|---|---|
+| ![Tema claro](docs/img/maquinas-claro.png) <br> **Tema claro.** Grupos na lateral, busca global e lista com usuário logado, MAC e IP real da máquina | ![Máquinas offline e registro duplicado](docs/img/maquinas-offline.png) <br> **Offline.** Último usuário visto e registro "duplicada" (mesmo MAC de uma máquina online: agente reinstalado) |
+| ![Histórico de acessos](docs/img/historico.png) <br> **Histórico.** Quem acessou o quê e quando, com filtros e exportação CSV | ![Usuários](docs/img/usuarios.png) <br> **Usuários.** Perfis, verificação em duas etapas e situação da senha |
+| ![Editar usuário](docs/img/editar-usuario.png) <br> **Permissões por grupo** e senha temporária | ![Verificação em duas etapas](docs/img/codigo-2fa.png) <br> **Login em duas etapas** (TOTP) |
+
 ## Recursos
 
 **Máquinas**
