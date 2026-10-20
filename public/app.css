@@ -455,7 +455,7 @@ dialog form { padding: 24px; }
    Responsivo
    ============================================================ */
 @media (max-width: 1560px) { .col-os { display: none; } }
-@media (max-width: 1300px) { .col-resp, .col-visto { display: none; } }
+@media (max-width: 1300px) { .col-mac, .col-visto { display: none; } }
 @media (max-width: 1080px) { .col-ip, .col-grupo { display: none; } .usuario-nome { display: none; } }
 
 @media (max-width: 760px) {
@@ -475,8 +475,25 @@ dialog form { padding: 24px; }
   .cab-lista { flex-direction: column; align-items: stretch; }
   .barra { flex-direction: column; }
   .barra select { flex: none; width: 100%; }
-  .col-local, .col-cliente, .col-chk, .tab-maq thead { display: none; }
+  .col-local, .col-usuario, .col-mac, .col-chk, .tab-maq thead { display: none; }
   .tab-maq td { max-width: none; white-space: normal; }
   .mobile-info { display: block; font-size: 12px; color: var(--suave); }
   .grade-form { grid-template-columns: 1fr; }
 }
+
+/* Senha: botao de mostrar/ocultar dentro do campo */
+.campo-senha { position: relative; display: block; }
+.campo-senha input { padding-right: 40px; }
+.campo-senha .ver-senha { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; }
+.campo-senha .ver-senha svg { width: 16px; height: 16px; }
+.link-esqueci { border: 0; background: none; padding: 2px 0; font: inherit; font-size: 13px; color: var(--primaria); cursor: pointer; align-self: center; }
+.link-esqueci:hover { text-decoration: underline; text-underline-offset: 3px; }
+.caixa-esqueci { margin: 0; padding: 10px 12px; border: 1px solid var(--borda); border-radius: var(--raio-p); line-height: 1.5; }
+.grade-form.uma-coluna { grid-template-columns: 1fr; }
+#modal-senha { width: min(440px, calc(100vw - 32px)); }
+
+/* Colunas usuario logado e MAC */
+.col-mac { font-family: var(--mono, 'JetBrains Mono', monospace); font-size: 12.5px; white-space: nowrap; }
+.col-local { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-usuario { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-usuario.ultimo { color: var(--suave); }

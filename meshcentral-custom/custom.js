@@ -259,6 +259,79 @@
     ref.parentNode.insertBefore(s, ref.nextSibling);
   }
 
+  // Qualidade automatica: mede a latencia a cada 3s. Quando ela sobe em relacao a melhor latencia da
+  // sessao (fila de imagens = rede congestionada), reduz qualidade, escala e quadros; quando normaliza,
+  // volta aos poucos para as configuracoes do usuario. Comparar com a melhor latencia (e nao com um valor
+  // fixo) evita derrubar a qualidade em links que sao sempre "longe" mas tem banda (ex.: filiais, ~300 ms).
+  var NIVEIS = [
+    null,                                              // 0: configuracoes do usuario
+    { q: 30, esc: 768, fr: 100, nome: 'rede lenta' },  // 1
+    { q: 15, esc: 512, fr: 400, nome: 'rede muito lenta' }, // 2
+  ];
+  var auto = { ligado: true, nivel: 0, base: null, amostras: [], bons: 0, sessao: null, orig: null, pinger: null };
+  try { auto.ligado = localStorage.getItem('painel.qualidadeAuto') !== '0'; } catch (e) { }
+
+  function aplicarNivel(n) {
+    var m = desktop && desktop.m; if (!m || !m.SendCompressionLevel || !auto.orig) return;
+    auto.nivel = n;
+    var o = auto.orig, p = NIVEIS[n];
+    if (p) m.SendCompressionLevel(o.tipo, Math.min(o.q, p.q), Math.min(o.esc, p.esc), Math.max(o.fr, p.fr));
+    else m.SendCompressionLevel(o.tipo, o.q, o.esc, o.fr);
+    atualizarStatusAuto();
+  }
+  function atualizarStatusAuto() {
+    var s = document.getElementById('painelQualidadeStatus'); if (!s) return;
+    var p = auto.ligado && NIVEIS[auto.nivel];
+    s.textContent = p ? p.nome + ': qualidade reduzida' : '';
+    s.title = p ? 'A conexão está lenta. A imagem foi simplificada para a sessão continuar fluida e volta ao normal sozinha quando a rede melhorar.' : '';
+  }
+  function novaAmostra(ms) {
+    if (!auto.ligado || ms < 0) return;
+    auto.amostras.push(ms); if (auto.amostras.length > 3) auto.amostras.shift();
+    var media = auto.amostras.reduce(function (a, b) { return a + b; }, 0) / auto.amostras.length;
+    if (auto.base == null || ms < auto.base) auto.base = ms;
+    var excesso = media - auto.base;
+    var alvo = (excesso > 400 || media > 1200) ? 2 : (excesso > 150 ? 1 : 0);
+    if (alvo > auto.nivel) { auto.bons = 0; aplicarNivel(alvo); }           // piora: reage na hora
+    else if (alvo < auto.nivel && excesso < 80) {                           // melhora: so depois de ~10s estavel, um degrau por vez
+      if (++auto.bons >= 3) { auto.bons = 0; aplicarNivel(auto.nivel - 1); }
+    } else auto.bons = 0;
+  }
+  function acompanharSessao() {
+    if (typeof desktop === 'undefined' || !desktop || desktop.State != 3 || !desktop.m) return;
+    if (auto.sessao !== desktop) { // sessao nova (ou reconexao): guarda as configuracoes e passa a medir
+      auto.sessao = desktop; auto.nivel = 0; auto.base = null; auto.amostras = []; auto.bons = 0;
+      var m = desktop.m;
+      auto.orig = { tipo: m.ImageType || 1, q: parseInt(m.CompressionLevel) || 50, esc: parseInt(m.ScalingLevel) || 1024, fr: parseInt(m.FrameRateTimer) || 100 };
+      var original = desktop.latency && desktop.latency.callback;
+      if (desktop.latency) desktop.latency.callback = function (ms) { if (original) original(ms); novaAmostra(ms); };
+      atualizarStatusAuto();
+    }
+    // O MeshCentral so mede a cada 10s; pedimos uma medida a cada 3s (mensagem minuscula)
+    if (auto.ligado && desktop.sendCtrlMsg) desktop.sendCtrlMsg(JSON.stringify({ ctrlChannel: '102938', type: 'rtt', time: new Date().getTime() }));
+  }
+  function adicionarQualidade() {
+    if (view !== 11 || document.getElementById('painelQualidade')) return;
+    var ref = document.getElementById('painelAtalhos') || document.getElementById('disconnectbutton1span');
+    if (!ref || !ref.parentNode) return;
+    var s = document.createElement('select'); s.id = 'painelQualidade';
+    s.title = 'Automática: reduz a qualidade da imagem quando a rede fica lenta e volta ao normal quando melhora';
+    s.style.cssText = 'margin-left:6px;cursor:pointer';
+    s.innerHTML = '<option value="1">Qualidade automática</option><option value="0">Qualidade fixa</option>';
+    s.value = auto.ligado ? '1' : '0';
+    s.onchange = function () {
+      auto.ligado = s.value === '1'; s.blur();
+      try { localStorage.setItem('painel.qualidadeAuto', auto.ligado ? '1' : '0'); } catch (e) { }
+      if (!auto.ligado && auto.nivel) aplicarNivel(0);
+      atualizarStatusAuto();
+    };
+    var st = document.createElement('span'); st.id = 'painelQualidadeStatus';
+    st.style.cssText = 'margin-left:8px;color:#f0b429;font-size:12px';
+    ref.parentNode.insertBefore(st, ref.nextSibling);
+    ref.parentNode.insertBefore(s, ref.nextSibling);
+    if (!auto.pinger) auto.pinger = setInterval(function () { try { acompanharSessao(); } catch (e) { } }, 3000);
+  }
+
   var tentativas = 0;
   var timer = setInterval(function () {
     tentativas++;
@@ -274,10 +347,11 @@
       // Modo tela cheia nativo do MeshCentral (o mesmo do botao de expandir da sessao).
       if (view === 13) { document.body.classList.add('fulldesk'); }
       else if (typeof fullscreen !== 'undefined' && !fullscreen) { deskToggleFull({}); }
-      document.title = (node.name || 'Máquina') + ' - Acesso Remoto';
+      document.title = (node.name || 'Máquina') + ' - PainelRemoto';
       adicionarBotaoTelaCheia();
       adicionarBotaoEnviar();
       adicionarAtalhos();
+      adicionarQualidade();
       if (view === 11) ativarArrastar();
       ligarAreaTransferencia();
 

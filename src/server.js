@@ -87,7 +87,25 @@ app.post('/api/login/codigo', (req, res) => {
 app.post('/api/logout', (req, res) => { auth.encerrarSessao(req, res); res.json({ ok: true }); });
 
 // Daqui pra baixo, tudo exige login.
-app.use('/api', auth.exigeLogin);
+app.use('/api', auth.exigeLogin, auth.exigeSenhaDefinitiva);
+
+// Troca da propria senha (tambem e o passo obrigatorio depois de uma senha temporaria).
+// Encerra as outras sessoes da pessoa; a sessao atual continua.
+app.post('/api/minha-senha', (req, res) => {
+  const ip = req.ip;
+  if (auth.bloqueado(ip)) return res.status(429).json({ erro: 'Muitas tentativas. Aguarde 15 minutos.' });
+  const u = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.usuario.id);
+  const atual = req.body.atual, nova = req.body.nova;
+  if (typeof atual !== 'string' || !auth.confereSenha(atual, u.senha_hash)) {
+    auth.registrarFalha(ip);
+    return res.status(400).json({ erro: 'A senha atual está incorreta.' });
+  }
+  if (typeof nova !== 'string' || nova.length < 8) return res.status(400).json({ erro: 'A nova senha precisa ter pelo menos 8 caracteres.' });
+  if (nova === atual) return res.status(400).json({ erro: 'A nova senha precisa ser diferente da atual.' });
+  db.prepare('UPDATE usuarios SET senha_hash = ?, trocar_senha = 0 WHERE id = ?').run(auth.hashSenha(nova), u.id);
+  db.prepare('DELETE FROM sessoes WHERE usuario_id = ? AND token <> ?').run(u.id, auth.lerCookie(req) || '');
+  res.json({ ok: true });
+});
 
 // Grupos liberados: null = todos (administrador); Set = so os marcados para o tecnico.
 function gruposPermitidos(usuario) {
@@ -302,7 +320,7 @@ app.get('/api/acessos', auth.exigeAdmin, (req, res) => {
 // ---- Usuarios do painel ----------------------------------------------------
 
 app.get('/api/usuarios', auth.exigeAdmin, (req, res) => {
-  const usuarios = db.prepare('SELECT id, nome, login, perfil, ativo, criado_em, totp_ativo, mesh_usuario FROM usuarios ORDER BY nome').all();
+  const usuarios = db.prepare('SELECT id, nome, login, perfil, ativo, criado_em, totp_ativo, mesh_usuario, trocar_senha FROM usuarios WHERE excluido_em IS NULL ORDER BY nome').all();
   const grupos = db.prepare('SELECT usuario_id, grupo_id FROM usuario_grupos').all();
   const confiaveis = Object.fromEntries(db.prepare('SELECT usuario_id, COUNT(*) n FROM dispositivos_confiaveis WHERE expira_em > ? GROUP BY usuario_id').all(Date.now()).map((r) => [r.usuario_id, r.n]));
   for (const u of usuarios) {
@@ -330,7 +348,8 @@ app.post('/api/usuarios', auth.exigeAdmin, (req, res) => {
   if (!nome || !login || typeof senha !== 'string' || senha.length < 8) return res.status(400).json({ erro: 'Preencha nome, login e uma senha de pelo menos 8 caracteres.' });
   if (!loginValido(login)) return res.status(400).json({ erro: 'O login aceita só letras, números, ponto, hífen e sublinhado, sem espaços.' });
   try {
-    const r = db.prepare('INSERT INTO usuarios (nome, login, senha_hash, perfil) VALUES (?, ?, ?, ?)').run(nome, login, auth.hashSenha(senha), perfil);
+    // Senha temporaria (padrao): a pessoa cria a propria no primeiro login.
+    const r = db.prepare('INSERT INTO usuarios (nome, login, senha_hash, perfil, trocar_senha) VALUES (?, ?, ?, ?, ?)').run(nome, login, auth.hashSenha(senha), perfil, req.body.senhaTemporaria === false ? 0 : 1);
     if (perfil === 'tecnico') gravarGrupos(r.lastInsertRowid, req.body.grupos);
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return res.status(409).json({ erro: 'Ja existe um usuario com esse login.' });
@@ -342,7 +361,7 @@ app.post('/api/usuarios', auth.exigeAdmin, (req, res) => {
 
 app.put('/api/usuarios/:id', auth.exigeAdmin, (req, res) => {
   const id = Number(req.params.id);
-  const alvo = db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+  const alvo = db.prepare('SELECT * FROM usuarios WHERE id = ? AND excluido_em IS NULL').get(id);
   if (!alvo) return res.status(404).json({ erro: 'Usuario nao encontrado.' });
   const perfil = req.body.perfil === 'admin' ? 'admin' : 'tecnico';
   const ativo = req.body.ativo ? 1 : 0;
@@ -352,7 +371,10 @@ app.put('/api/usuarios/:id', auth.exigeAdmin, (req, res) => {
   if (novaSenha && novaSenha.length < 8) return res.status(400).json({ erro: 'A senha precisa ter pelo menos 8 caracteres.' });
   db.prepare('UPDATE usuarios SET nome = ?, perfil = ?, ativo = ? WHERE id = ?').run(txt(req.body.nome) || alvo.nome, perfil, ativo, id);
   if (novaSenha) {
-    db.prepare('UPDATE usuarios SET senha_hash = ? WHERE id = ?').run(auth.hashSenha(novaSenha), id);
+    // Senha definida para outra pessoa: temporaria, salvo se o administrador desmarcar
+    const temporaria = id !== req.usuario.id && req.body.senhaTemporaria !== false;
+    db.prepare('UPDATE usuarios SET senha_hash = ?, trocar_senha = ? WHERE id = ?').run(auth.hashSenha(novaSenha), temporaria ? 1 : 0, id);
+    if (id !== req.usuario.id) db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(id);
   }
   // Troca de senha, redefinicao do app, desativacao ou pedido explicito: computadores confiaveis deixam de valer.
   if (novaSenha || req.body.redefinir2fa === true || !ativo || req.body.esquecerComputadores === true) auth.esquecerDispositivos(id);
@@ -364,6 +386,26 @@ app.put('/api/usuarios/:id', auth.exigeAdmin, (req, res) => {
     db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(id);
   }
   if (!ativo) db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(id);
+  mesh.agendarSincronizacao();
+  res.json({ ok: true });
+});
+
+// Exclusao: o registro fica (o historico de acessos continua mostrando o nome), mas sai da lista,
+// perde sessoes, app autenticador, computadores confiaveis e grupos, e libera o login para reuso.
+// A sincronizacao apaga a conta painel-<login> dele no MeshCentral (usuario inativo).
+app.delete('/api/usuarios/:id', auth.exigeAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const alvo = db.prepare('SELECT * FROM usuarios WHERE id = ? AND excluido_em IS NULL').get(id);
+  if (!alvo) return res.status(404).json({ erro: 'Usuário não encontrado.' });
+  if (id === req.usuario.id) return res.status(400).json({ erro: 'Você não pode excluir o próprio usuário.' });
+  if (alvo.perfil === 'admin' && alvo.ativo) {
+    const outros = db.prepare("SELECT COUNT(*) n FROM usuarios WHERE perfil = 'admin' AND ativo = 1 AND excluido_em IS NULL AND id <> ?").get(id).n;
+    if (!outros) return res.status(400).json({ erro: 'Este é o único administrador ativo.' });
+  }
+  db.prepare("UPDATE usuarios SET ativo = 0, excluido_em = datetime('now'), login = login || '#excluido-' || id, totp_segredo = NULL, totp_ativo = 0 WHERE id = ?").run(id);
+  db.prepare('DELETE FROM sessoes WHERE usuario_id = ?').run(id);
+  db.prepare('DELETE FROM usuario_grupos WHERE usuario_id = ?').run(id);
+  auth.esquecerDispositivos(id);
   mesh.agendarSincronizacao();
   res.json({ ok: true });
 });

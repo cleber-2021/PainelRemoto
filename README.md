@@ -14,7 +14,9 @@ autenticação em duas etapas e uma experiência de uso simplificada para a equi
 
 **Máquinas**
 - Lista sincronizada com o MeshCentral a cada 15 s e em tempo real quando uma máquina conecta ou desconecta
-- Busca global (nome, IP, usuário logado, setor, responsável, patrimônio...), filtros e lista compacta para parques grandes
+- Busca global (nome, IP, MAC, usuário logado, local, setor, patrimônio...), filtros e lista compacta para parques grandes
+- Lista com **usuário logado** (ou o último visto, se a máquina estiver offline), **MAC** e local/posto de cada máquina
+- Detecta registros duplicados: quando o agente é reinstalado e ganha outra identidade, o registro antigo é marcado "duplicada" (mesmo MAC do registro online)
 - Cadastro complementar por máquina: nome no painel, cliente, local, setor, responsável, patrimônio e observação
 - IP real da interface de rede (não o do gateway/NAT) e nome atual do Windows, mesmo após renomear o computador
 - Grupos (um instalador por grupo: a máquina entra sozinha no grupo do instalador usado), mover em lote e excluir offline em lote
@@ -27,9 +29,15 @@ autenticação em duas etapas e uma experiência de uso simplificada para a equi
 - Menu de atalhos rápidos (Win+R, Win+E, Win+X, Win+L, Ctrl+Alt+Del...)
 - Área de transferência sincronizada por padrão (copiar aqui, colar lá)
 - **Enviar arquivos** ou arrastar arquivos para a janela: vão para a Área de Trabalho do usuário logado (com suporte a OneDrive)
+- **Qualidade automática:** mede a latência a cada 3 s e, se ela subir em relação à melhor latência da sessão (rede congestionada),
+  reduz qualidade, resolução e quadros por segundo em dois degraus; quando a rede normaliza, volta sozinha às configurações do técnico.
+  Comparar com a melhor latência da sessão evita derrubar a qualidade em links que são sempre longe, mas têm banda
 
 **Segurança**
 - Verificação em duas etapas (TOTP, RFC 6238) obrigatória, implementada sem dependências, com opção "confiar neste computador"
+- Senhas com scrypt. Senha definida pelo administrador pode ser **temporária**: no próximo login a pessoa é obrigada a criar a própria
+- Cada usuário troca a própria senha; "Esqueci minha senha" orienta a pedir uma senha temporária ao administrador
+- Exclusão de usuários preservando o histórico de acessos (e removendo a conta dele no MeshCentral)
 - Links de acesso com token AES-256-GCM **de uso único e válido por 1 minuto**
 - Cada usuário do painel tem uma conta própria no MeshCentral (`painel-<login>`), criada e com direitos reconciliados pelo painel:
   técnicos veem e acessam só os grupos liberados para eles
@@ -39,6 +47,7 @@ autenticação em duas etapas e uma experiência de uso simplificada para a equi
 
 **Interface**
 - Tema claro e escuro, fontes Inter e JetBrains Mono embutidas, HTML/CSS/JS puro (sem framework nem build)
+- Botão de mostrar/ocultar em todos os campos de senha
 
 ## Arquitetura
 
@@ -122,6 +131,13 @@ autenticação em duas etapas e uma experiência de uso simplificada para a equi
 - **Em massa, via GPO:** veja `implantacao/LEIA-ME.md`. O script escolhe o grupo pela OU do computador, ignora servidores
   e reinstala sozinho agentes que apontam para um endereço antigo do servidor.
 
+### Aviso ao usuário da máquina
+
+O exemplo de configuração usa `userConsentFlags: 1`: quando o acesso à tela começa, aparece só uma notificação do Windows
+(texto em `notificationMessages`), sem barra fixa no topo da tela. Com `64`, o MeshCentral mostra a barra de privacidade, que fica
+por cima do conteúdo e tem um X que permite ao usuário encerrar a sessão. Máquinas marcadas no painel com "Pedir permissão ao
+usuário" continuam pedindo autorização. Depois de mudar o `config.json` do MeshCentral, reinicie o MeshCentral.
+
 ### Antivírus
 
 Antivírus com proteção comportamental podem injetar módulos no agente e impedir a captura de tela
@@ -135,6 +151,10 @@ Antivírus com proteção comportamental podem injetar módulos no agente e impe
 - **Emergência 2FA** (único administrador perdeu o celular), no servidor:
   ```bash
   node scripts/redefinir-2fa.js <login>
+  ```
+- **Emergência senha** (único administrador esqueceu a senha), no servidor. Define uma senha temporária:
+  ```bash
+  node scripts/redefinir-senha.js <login> <senha-temporaria>
   ```
 - **Backup:** guarde fora do servidor a pasta `data/` do painel e o backup do MeshCentral (`autoBackup`).
   Sem as chaves do `meshcentral-data`, todos os agentes precisam ser reinstalados.

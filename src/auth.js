@@ -44,7 +44,7 @@ function usuarioDaSessao(req) {
   const token = lerCookie(req);
   if (!token) return null;
   return db.prepare(`
-    SELECT u.id, u.nome, u.login, u.perfil FROM sessoes s
+    SELECT u.id, u.nome, u.login, u.perfil, u.trocar_senha FROM sessoes s
     JOIN usuarios u ON u.id = s.usuario_id
     WHERE s.token = ? AND s.expira_em > ? AND u.ativo = 1
   `).get(token, Date.now()) || null;
@@ -54,6 +54,12 @@ function exigeLogin(req, res, next) {
   const u = usuarioDaSessao(req);
   if (!u) return res.status(401).json({ erro: 'Sessao expirada. Entre novamente.' });
   req.usuario = u;
+  next();
+}
+
+// Com senha temporaria, so da para criar a nova senha (e sair).
+function exigeSenhaDefinitiva(req, res, next) {
+  if (req.usuario.trocar_senha && req.path !== '/minha-senha') return res.status(403).json({ erro: 'Crie uma nova senha para continuar.', trocarSenha: true });
   next();
 }
 
@@ -103,6 +109,6 @@ function registrarFalha(ip) {
 
 module.exports = {
   hashSenha, confereSenha, criarSessao, encerrarSessao, usuarioDaSessao,
-  exigeLogin, exigeAdmin, bloqueado, registrarFalha,
+  exigeLogin, exigeSenhaDefinitiva, exigeAdmin, lerCookie, bloqueado, registrarFalha,
   confiarDispositivo, dispositivoConfiavel, esquecerDispositivos, DIAS_CONFIAR,
 };

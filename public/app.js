@@ -48,6 +48,7 @@ async function api(metodo, url, corpo) {
   });
   const dados = await r.json().catch(() => ({}));
   if (r.status === 401 && url !== '/api/login') { mostrarEntrada(); throw new Error(dados.erro || 'Sessão expirada'); }
+  if (r.status === 403 && dados.trocarSenha) abrirMinhaSenha(true);
   if (!r.ok) throw new Error(dados.erro || 'Erro ' + r.status);
   return dados;
 }
@@ -84,6 +85,8 @@ const osCurto = (os) => (os || '').replace(/^Microsoft\s+/, '').replace(/\s+-\s+
 const nomeDe = (m) => m.apelido || m.mesh_nome;
 const semCadastro = (m) => !m.apelido && !m.cliente && !m.local && !m.setor && !m.responsavel;
 const ehAdmin = () => usuario?.perfil === 'admin';
+// "EMPRESA\\joao.silva" -> "joao.silva" (o dominio fica no title)
+const usuarioCurto = (u) => (u || '').split(',').map((x) => x.trim().split('\\').pop()).filter(Boolean).join(', ');
 
 // ---- Entrada ---------------------------------------------------------------
 
@@ -111,6 +114,34 @@ $('#form-entrada').addEventListener('submit', async (e) => {
     erro.hidden = false;
   }
 });
+
+$('#btn-esqueci').addEventListener('click', () => { $('#texto-esqueci').hidden = !$('#texto-esqueci').hidden; });
+
+// ---- Mostrar/ocultar senha -------------------------------------------------
+// Todo campo de senha ganha um botao de olho. Ao enviar o formulario, volta a ficar oculto.
+function prepararCamposSenha() {
+  document.querySelectorAll('input[type=password]').forEach((input) => {
+    if (input.parentElement.classList.contains('campo-senha')) return;
+    const caixa = document.createElement('span');
+    caixa.className = 'campo-senha';
+    input.replaceWith(caixa);
+    const botao = document.createElement('button');
+    botao.type = 'button'; botao.className = 'icone ver-senha'; botao.tabIndex = -1;
+    botao.innerHTML = '<svg><use href="#i-olho"/></svg>';
+    const mostrar = (sim) => {
+      input.type = sim ? 'text' : 'password';
+      botao.querySelector('use').setAttribute('href', sim ? '#i-olho-fechado' : '#i-olho');
+      botao.title = sim ? 'Ocultar senha' : 'Mostrar senha';
+      botao.setAttribute('aria-label', botao.title);
+    };
+    botao.addEventListener('click', () => { mostrar(input.type === 'password'); input.focus(); });
+    input.form?.addEventListener('submit', () => mostrar(false));
+    input.form?.addEventListener('reset', () => mostrar(false));
+    mostrar(false);
+    caixa.append(input, botao);
+  });
+}
+prepararCamposSenha();
 
 // ---- Segunda etapa do login (codigo do aplicativo) --------------------------
 
@@ -159,6 +190,45 @@ $('#btn-sair').addEventListener('click', async () => {
   await api('POST', '/api/logout');
   usuario = null;
   mostrarEntrada();
+});
+
+// ---- Minha senha -----------------------------------------------------------
+// obrigatoria = senha temporaria definida por um administrador: nao da para fechar sem trocar.
+let senhaObrigatoria = false;
+function abrirMinhaSenha(obrigatoria) {
+  senhaObrigatoria = !!obrigatoria;
+  const m = $('#modal-senha');
+  if (m.open) return;
+  $('#form-senha').reset();
+  $('#senha-titulo').textContent = senhaObrigatoria ? 'Crie a sua senha' : 'Alterar minha senha';
+  $('#senha-sub').hidden = !senhaObrigatoria;
+  $('#rotulo-senha-atual').textContent = senhaObrigatoria ? 'Senha temporária' : 'Senha atual';
+  $('#btn-senha-cancelar').hidden = senhaObrigatoria;
+  $('#btn-senha-sair').hidden = !senhaObrigatoria;
+  $('#senha-erro').hidden = true;
+  m.showModal();
+}
+$('#btn-minha-senha').addEventListener('click', () => abrirMinhaSenha(false));
+$('#btn-senha-sair').addEventListener('click', () => { senhaObrigatoria = false; $('#modal-senha').close(); $('#btn-sair').click(); });
+$('#modal-senha').addEventListener('cancel', (e) => { if (senhaObrigatoria) e.preventDefault(); }); // Esc nao fecha
+
+$('#form-senha').addEventListener('submit', async (e) => {
+  if (e.submitter?.value === 'cancelar') return;
+  e.preventDefault();
+  const f = e.target, erro = $('#senha-erro');
+  erro.hidden = true;
+  if (f.elements.nova.value !== f.elements.repetir.value) { erro.textContent = 'As duas senhas novas não são iguais.'; erro.hidden = false; return; }
+  try {
+    await api('POST', '/api/minha-senha', { atual: f.elements.atual.value, nova: f.elements.nova.value });
+    const eraObrigatoria = senhaObrigatoria;
+    senhaObrigatoria = false;
+    $('#modal-senha').close();
+    toast('Senha alterada.');
+    if (eraObrigatoria) iniciar();
+  } catch (err) {
+    erro.textContent = err.message;
+    erro.hidden = false;
+  }
 });
 
 // ---- Abas ------------------------------------------------------------------
@@ -345,7 +415,7 @@ function filtradas() {
     }
     if (cliente && m.cliente !== cliente) return false;
     if (!termos.length) return true;
-    const texto = normalizar([m.apelido, m.mesh_nome, m.cliente, m.local, m.setor, m.responsavel, m.patrimonio, m.ip_local, m.mesh_ip, m.observacao, m.mesh_grupo_nome, osCurto(m.mesh_os), m.pedir_permissao ? 'pede permissao' : '', m.fora_dominio ? 'fora do dominio' : ''].filter(Boolean).join(' | '));
+    const texto = normalizar([m.apelido, m.mesh_nome, m.cliente, m.local, m.setor, m.responsavel, m.patrimonio, m.ip_local, m.mesh_ip, m.mac, m.usuario_logado, m.observacao, m.mesh_grupo_nome, osCurto(m.mesh_os), m.pedir_permissao ? 'pede permissao' : '', m.fora_dominio ? 'fora do dominio' : ''].filter(Boolean).join(' | '));
     return termos.every((t) => texto.includes(t));
   });
 }
@@ -414,9 +484,9 @@ const CHAVES = {
   online: (m) => (m.online ? 1 : 0),
   nome: (m) => nomeDe(m).toLowerCase(),
   grupo: (m) => (m.mesh_grupo_nome || '').toLowerCase(),
-  cliente: (m) => (m.cliente || '').toLowerCase(),
-  local: (m) => [m.local, m.setor].filter(Boolean).join(' ').toLowerCase(),
-  responsavel: (m) => (m.responsavel || '').toLowerCase(),
+  local: (m) => (m.local || '').toLowerCase(),
+  usuario: (m) => usuarioCurto(m.usuario_logado).toLowerCase(),
+  mac: (m) => m.mac || '',
   ip: (m) => ipDe(m).split('.').map((n) => n.padStart(3, '0')).join('.'),
   os: (m) => osCurto(m.mesh_os).toLowerCase(),
   visto: (m) => (m.online ? '9' : (m.ultimo_online || '0')),
@@ -463,7 +533,17 @@ function renderMaquinas() {
       : (grupoAtual && !grupoAtual.total ? 'Grupo vazio. Baixe o instalador e execute no computador.' : 'Nenhuma máquina com esses filtros.');
     corpo.innerHTML = `<tr><td colspan="11" class="vazio-celula">${msg}</td></tr>`;
   } else {
+    // Mesma placa de rede (MAC) em mais de um registro = mesmo computador com o agente reinstalado
+    const porMac = new Map();
+    for (const x of maquinas) if (x.mac && !x.removida_mesh) porMac.set(x.mac, [...(porMac.get(x.mac) || []), x]);
+    const duplicadaDe = (m) => {
+      if (!m.mac || m.online) return null;
+      const outra = (porMac.get(m.mac) || []).find((x) => x !== m && x.online);
+      return outra ? nomeDe(outra) : null;
+    };
     corpo.innerHTML = pagina.map((m) => {
+      const dup = duplicadaDe(m);
+      const usu = usuarioCurto(m.usuario_logado);
       const des = m.online ? '' : 'disabled';
       const localSetor = [m.local, m.setor].filter(Boolean).join(' · ');
       const traco = '<span class="traco">—</span>';
@@ -473,14 +553,14 @@ function renderMaquinas() {
         ${admin ? `<td class="col-chk"><input type="checkbox" data-chk ${selecionadas.has(m.node_id) ? 'checked' : ''}></td>` : ''}
         <td class="col-st"><span class="status ${m.online ? 'on' : ''}" title="${m.online ? 'Online' : 'Offline'}"></span></td>
         <td title="${esc(m.mesh_nome)}">
-          <span class="nome">${destacar(nomeDe(m))}</span>${m.pedir_permissao ? '<span class="pede-permissao" title="Pede permissão ao usuário antes do acesso"><svg><use href="#i-permissao"/></svg></span>' : ''}${m.removida_mesh ? '<span class="etiqueta">removida</span>' : m.fora_dominio ? '<span class="etiqueta" title="O nome desta máquina não existe no AD">fora do domínio</span>' : semCadastro(m) ? '<span class="etiqueta nova">nova</span>' : ''}
+          <span class="nome">${destacar(nomeDe(m))}</span>${m.pedir_permissao ? '<span class="pede-permissao" title="Pede permissão ao usuário antes do acesso"><svg><use href="#i-permissao"/></svg></span>' : ''}${m.removida_mesh ? '<span class="etiqueta">removida</span>' : dup ? `<span class="etiqueta" title="Mesma placa de rede (MAC) de &quot;${esc(dup)}&quot;, que está online: é o mesmo computador com o agente reinstalado. Copie o cadastro para o registro online e exclua este.">duplicada</span>` : m.fora_dominio ? '<span class="etiqueta" title="O nome desta máquina não existe no AD">fora do domínio</span>' : semCadastro(m) ? '<span class="etiqueta nova">nova</span>' : ''}
           ${m.apelido ? `<div class="nome-sub">${destacar(m.mesh_nome)}</div>` : ''}
           <div class="mobile-info">${esc(info)}</div>
         </td>
         <td class="col-grupo">${destacar(m.mesh_grupo_nome) || traco}</td>
-        <td class="col-cliente">${destacar(m.cliente) || traco}</td>
-        <td class="col-local" title="${esc(localSetor)}">${destacar(localSetor) || traco}</td>
-        <td class="col-resp">${destacar(m.responsavel) || traco}</td>
+        <td class="col-local" title="${esc(localSetor)}">${destacar(m.local) || traco}</td>
+        <td class="col-usuario ${m.online ? '' : 'ultimo'}" title="${esc(m.usuario_logado ? (m.online ? 'Logado agora: ' : 'Último usuário visto: ') + m.usuario_logado : (m.online ? 'Ninguém logado' : ''))}">${destacar(usu) || traco}</td>
+        <td class="col-mac">${destacar(m.mac) || traco}</td>
         <td class="col-ip" title="${esc(m.ip_local ? 'IP da máquina: ' + m.ip_local + (m.mesh_ip ? ' · conexão vinda de ' + m.mesh_ip : '') : 'IP da conexão (IP da máquina ainda não informado)')}">${destacar(ipDe(m)) || traco}${ipVia(m) ? `<div class="ip-via">via ${destacar(ipVia(m))}</div>` : ''}</td>
         <td class="col-os" title="${esc(m.mesh_os)}">${esc(osCurto(m.mesh_os)) || traco}</td>
         <td class="col-visto" title="${m.online ? 'Online agora' : dataBR(m.ultimo_online)}">${m.online ? 'agora' : haQuanto(m.ultimo_online)}</td>
@@ -797,6 +877,7 @@ async function carregarUsuarios() {
     <tr><td>${esc(u.nome)}</td><td>${esc(u.login)}</td><td>${u.perfil === 'admin' ? 'Administrador' : 'Técnico'}</td>
     <td class="celula-grupos" title="${esc(nomes)}">${celula}</td>
     <td>${u.totp_ativo ? '<span class="selo ok">Ativa</span>' : '<span class="selo pendente">No próximo login</span>'}</td>
+    <td>${u.trocar_senha ? '<span class="selo pendente" title="Definida por um administrador; a pessoa cria a própria no próximo login">Temporária</span>' : '<span class="selo ok">Própria</span>'}</td>
     <td>${u.ativo ? 'Ativo' : 'Inativo'}</td>
     <td><button class="btn fantasma pequeno" data-usuario="${u.id}">Editar</button></td></tr>`;
   }).join('');
@@ -832,6 +913,10 @@ function abrirUsuario(u) {
   f.elements.perfil.value = u?.perfil || 'tecnico';
   f.elements.ativo.checked = u ? !!u.ativo : true;
   $('#campo-ativo').hidden = !u;
+  $('#btn-excluir-usuario').hidden = !u || u.id === usuario.id;
+  // Na propria conta a senha nunca e temporaria (troca direto)
+  $('#campo-senha-temp').hidden = !!u && u.id === usuario.id;
+  f.elements.senhaTemporaria.checked = true;
   $('#usuario-erro').hidden = true;
   atualizarCampoGrupos();
   $('#modal-usuario').showModal();
@@ -843,12 +928,26 @@ $('#lista-usuarios').addEventListener('click', (e) => {
   if (id) abrirUsuario(usuarios.find((u) => u.id === Number(id)));
 });
 
+$('#btn-excluir-usuario').addEventListener('click', async () => {
+  const u = editandoUsuario;
+  if (!u || !confirm(`Excluir o usuário "${u.nome}" (${u.login})?\n\nEle perde o acesso na hora. O histórico de acessos dele continua guardado.`)) return;
+  try {
+    await api('DELETE', `/api/usuarios/${u.id}`);
+    $('#modal-usuario').close();
+    toast('Usuário excluído.');
+    carregarUsuarios();
+  } catch (err) {
+    $('#usuario-erro').textContent = err.message;
+    $('#usuario-erro').hidden = false;
+  }
+});
+
 $('#form-usuario').addEventListener('submit', async (e) => {
   if (e.submitter?.value === 'cancelar') return;
   e.preventDefault();
   const f = e.target;
   const dados = {
-    nome: f.elements.nome.value, senha: f.elements.senha.value, perfil: f.elements.perfil.value,
+    nome: f.elements.nome.value, senha: f.elements.senha.value, perfil: f.elements.perfil.value, senhaTemporaria: f.elements.senhaTemporaria.checked,
     grupos: [...f.querySelectorAll('input[name=grupo]:checked')].map((c) => c.value),
   };
   if (dados.perfil === 'tecnico' && !dados.grupos.length && !confirm('Nenhum grupo marcado: este técnico não vai ver nenhuma máquina. Salvar assim mesmo?')) return;
@@ -881,6 +980,7 @@ async function iniciar() {
   $('#usuario-avatar').textContent = iniciais(usuario.nome);
   $('#usuario-avatar').title = usuario.nome + (usuario.perfil === 'admin' ? ' · Administrador' : ' · Técnico');
   document.querySelectorAll('[data-admin]').forEach((el) => (el.hidden = !ehAdmin()));
+  if (usuario.trocar_senha) return abrirMinhaSenha(true);
   abrirAba('maquinas');
   await carregarMaquinas();
   clearInterval(atualizador);

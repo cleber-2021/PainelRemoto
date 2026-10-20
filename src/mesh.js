@@ -73,9 +73,11 @@ function wsUrl() {
 }
 
 const upsertMaquina = db.prepare(`
-  INSERT INTO maquinas (node_id, mesh_nome, mesh_grupo_id, mesh_grupo_nome, mesh_os, mesh_ip, online, ultimo_online, removida_mesh, pedir_permissao)
-  VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') END, 0, ?)
+  INSERT INTO maquinas (node_id, mesh_nome, mesh_grupo_id, mesh_grupo_nome, mesh_os, mesh_ip, online, ultimo_online, removida_mesh, pedir_permissao, usuario_logado)
+  VALUES (?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 1 THEN datetime('now') END, 0, ?, ?)
   ON CONFLICT(node_id) DO UPDATE SET
+    -- online: quem esta logado agora (vazio = ninguem); offline: guarda o ultimo visto
+    usuario_logado = CASE WHEN excluded.online = 1 THEN excluded.usuario_logado ELSE maquinas.usuario_logado END,
     pedir_permissao = excluded.pedir_permissao,
     mesh_nome = excluded.mesh_nome,
     mesh_grupo_id = excluded.mesh_grupo_id,
@@ -98,7 +100,8 @@ function aplicarNodes(nodesPorGrupo) {
         vistos.add(n._id);
         upsertMaquina.run(n._id, n.rname || n.name || n.host || n._id, // rname = nome atual do Windows (o agente informa a cada conexao)
           grupoId, nomesGrupo[grupoId] || null,
-          n.osdesc || null, n.ip || null, online, online, (n.consent & CONSENTIMENTO) ? 1 : 0);
+          n.osdesc || null, n.ip || null, online, online, (n.consent & CONSENTIMENTO) ? 1 : 0,
+          online ? (Array.isArray(n.users) ? n.users.join(', ') : '') : null);
       }
     }
     // Maquinas que sumiram do MeshCentral ficam marcadas, sem apagar o cadastro.
@@ -198,19 +201,19 @@ function escolherIpLocal(netif2) {
   // 1) ativa e com gateway (a placa que de fato fala com a rede), preferindo cabo
   const comGateway = ativas.filter((i) => i.gateway);
   const escolhida = comGateway.find((i) => i.type === 'ethernet') || comGateway[0] || ativas[0] || null;
-  return escolhida ? escolhida.address : null;
+  return escolhida ? { ip: escolhida.address, mac: escolhida.mac && escolhida.mac !== '00:00:00:00:00:00' ? escolhida.mac.toUpperCase() : null } : null;
 }
 
 // Registra a hora da consulta mesmo sem IP valido (senao a maquina seria consultada a cada ciclo);
 // sem IP novo, mantem o ultimo conhecido.
-const gravarIp = db.prepare("UPDATE maquinas SET ip_local = ?, ip_local_em = datetime('now') WHERE node_id = ?");
+const gravarIp = db.prepare("UPDATE maquinas SET ip_local = ?, mac = COALESCE(?, mac), ip_local_em = datetime('now') WHERE node_id = ?");
 // Sem IP na resposta (comum logo apos instalar: o agente ainda nao informou as placas):
 // mantem o ultimo IP conhecido e agenda nova consulta em ~2 min, em vez de 30.
 const adiarIp = db.prepare("UPDATE maquinas SET ip_local_em = datetime('now', '-28 minutes') WHERE node_id = ?");
 function gravarIpLocal(msg) {
   if (!msg.nodeid) return;
-  const ip = msg.noinfo ? null : escolherIpLocal(msg.netif2);
-  if (ip) gravarIp.run(ip, msg.nodeid); else adiarIp.run(msg.nodeid);
+  const placa = msg.noinfo ? null : escolherIpLocal(msg.netif2);
+  if (placa) gravarIp.run(placa.ip, placa.mac, msg.nodeid); else adiarIp.run(msg.nodeid);
 }
 
 function pedirIpsLocais() {
@@ -290,7 +293,8 @@ async function sincronizarPermissoes() {
   sincronizando = true;
   try {
     const usuariosMesh = new Map((await listarUsuariosMesh()).map((u) => [u._id, u]));
-    const pessoas = db.prepare('SELECT id, nome, login, perfil, ativo, mesh_usuario FROM usuarios').all();
+    // Inativos primeiro: um login reaproveitado nao tem a conta apagada depois de criada
+    const pessoas = db.prepare('SELECT id, nome, login, perfil, ativo, mesh_usuario FROM usuarios ORDER BY ativo, id').all();
     const liberados = db.prepare('SELECT usuario_id, grupo_id FROM usuario_grupos').all();
     const gruposDe = new Map();
     for (const l of liberados) { if (!gruposDe.has(l.usuario_id)) gruposDe.set(l.usuario_id, new Set()); gruposDe.get(l.usuario_id).add(l.grupo_id); }
@@ -303,7 +307,9 @@ async function sincronizarPermissoes() {
       const nome = nomeMeshDe(p.login);
       const id = 'user//' + nome;
       if (!p.ativo) {
-        if (usuariosMesh.has(id)) { await comando({ action: 'deleteuser', userid: id }, true); mudou = true; }
+        // Usuario excluido tem o login renomeado: a conta no MeshCentral e a que ficou gravada
+        const antigo = 'user//' + (p.mesh_usuario || nome);
+        if (usuariosMesh.has(antigo)) { await comando({ action: 'deleteuser', userid: antigo }, true); usuariosMesh.delete(antigo); mudou = true; }
         if (p.mesh_usuario) gravarNome.run(null, p.id);
         continue;
       }

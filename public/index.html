@@ -29,6 +29,9 @@
     <symbol id="i-sair" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/></symbol>
     <symbol id="i-busca" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></g></symbol>
     <symbol id="i-permissao" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M3 20v-1a6 6 0 0 1 9.5-4.9M16 17l2 2 4-4"/></g></symbol>
+    <symbol id="i-olho" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></g></symbol>
+    <symbol id="i-olho-fechado" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.5M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a9.7 9.7 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></g></symbol>
+    <symbol id="i-chave" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M18.5 4.5l2 2"/></g></symbol>
     <symbol id="i-add" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" d="M12 5v14M5 12h14"/></symbol>
   </svg>
 
@@ -43,6 +46,9 @@
       <label>Senha<input name="senha" type="password" autocomplete="current-password" required></label>
       <p id="entrada-erro" class="erro" hidden></p>
       <button class="btn primario" type="submit" id="entrada-btn">Entrar</button>
+      <button class="link-esqueci" type="button" id="btn-esqueci">Esqueci minha senha</button>
+      <p class="nota caixa-esqueci" id="texto-esqueci" hidden>Peça a um administrador do painel para definir uma <b>senha temporária</b> para você
+        (Usuários → Editar → Senha). No próximo login, o painel pede para você criar uma senha nova.</p>
     </form>
 
     <!-- Segunda etapa: codigo do aplicativo autenticador (e cadastro do app no primeiro login) -->
@@ -80,6 +86,7 @@
         <button class="icone botao-tema" data-tema-botao title="Tema"><svg><use href="#i-auto"/></svg></button>
         <span class="avatar" id="usuario-avatar"></span>
         <span class="usuario-nome" id="usuario-nome"></span>
+        <button id="btn-minha-senha" class="icone" title="Alterar minha senha"><svg><use href="#i-chave"/></svg></button>
         <button id="btn-sair" class="icone" title="Sair"><svg><use href="#i-sair"/></svg></button>
       </div>
     </header>
@@ -138,9 +145,9 @@
                 <th class="col-st" data-ordem="online" title="Status"></th>
                 <th data-ordem="nome">Nome</th>
                 <th class="col-grupo" data-ordem="grupo">Grupo</th>
-                <th class="col-cliente" data-ordem="cliente">Cliente</th>
-                <th class="col-local" data-ordem="local">Local / Setor</th>
-                <th class="col-resp" data-ordem="responsavel">Responsável</th>
+                <th class="col-local" data-ordem="local">Local / posto</th>
+                <th class="col-usuario" data-ordem="usuario">Usuário logado</th>
+                <th class="col-mac" data-ordem="mac">MAC</th>
                 <th class="col-ip" data-ordem="ip">IP</th>
                 <th class="col-os" data-ordem="os">Sistema</th>
                 <th class="col-visto" data-ordem="visto">Visto</th>
@@ -197,7 +204,7 @@
         <button class="btn primario" id="btn-novo-usuario">Novo usuário</button>
       </div>
       <div class="tabela-wrap"><table class="tabela">
-        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Grupos</th><th>2 etapas</th><th>Situação</th><th></th></tr></thead>
+        <thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Grupos</th><th>2 etapas</th><th>Senha</th><th>Situação</th><th></th></tr></thead>
         <tbody id="lista-usuarios"></tbody>
       </table></div>
     </main>
@@ -284,11 +291,33 @@
         <label class="check"><input type="checkbox" name="redefinir2fa"> Redefinir (a pessoa cadastra o app de novo no próximo login)</label>
         <label class="check" id="campo-esquecer"><input type="checkbox" name="esquecerComputadores"> <span id="texto-esquecer"></span></label>
       </div>
+      <label class="check confiar" id="campo-senha-temp"><input type="checkbox" name="senhaTemporaria" checked> <span>Senha temporária<br><small>No próximo login a pessoa é obrigada a criar a própria senha. Desmarque para a senha valer como definitiva.</small></span></label>
       <p class="erro" id="usuario-erro" hidden></p>
       <div class="acoes-modal">
+        <button class="btn perigo" type="button" id="btn-excluir-usuario" hidden>Excluir usuário</button>
         <span class="espaco"></span>
         <button class="btn fantasma" value="cancelar" formnovalidate>Cancelar</button>
         <button class="btn primario" value="salvar">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Modal minha senha (tambem obrigatorio depois de senha temporaria) -->
+  <dialog id="modal-senha">
+    <form method="dialog" id="form-senha">
+      <h3 id="senha-titulo">Alterar minha senha</h3>
+      <p class="sub" id="senha-sub" hidden>Sua senha atual foi definida por um administrador. Crie uma senha só sua para continuar.</p>
+      <div class="grade-form uma-coluna">
+        <label><span id="rotulo-senha-atual">Senha atual</span><input name="atual" type="password" autocomplete="current-password" required></label>
+        <label>Nova senha<input name="nova" type="password" autocomplete="new-password" minlength="8" required placeholder="Mínimo 8 caracteres"></label>
+        <label>Repita a nova senha<input name="repetir" type="password" autocomplete="new-password" minlength="8" required></label>
+      </div>
+      <p class="erro" id="senha-erro" hidden></p>
+      <div class="acoes-modal">
+        <span class="espaco"></span>
+        <button class="btn fantasma" value="cancelar" id="btn-senha-cancelar" formnovalidate>Cancelar</button>
+        <button class="btn fantasma" type="button" id="btn-senha-sair" hidden>Sair</button>
+        <button class="btn primario" value="salvar">Salvar senha</button>
       </div>
     </form>
   </dialog>

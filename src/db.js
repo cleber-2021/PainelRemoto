@@ -99,5 +99,12 @@ garantirColuna('maquinas', 'ip_local', 'TEXT');
 garantirColuna('maquinas', 'ip_local_em', 'TEXT');
 // 1 = nome nao existe no AD (ex.: VM de sandbox de antivirus); NULL = ainda nao conferido
 garantirColuna('maquinas', 'fora_dominio', 'INTEGER');
+// 1 = senha definida por um administrador (temporaria): a pessoa cria a propria no proximo login
+// MAC da placa de rede usada (getnetworkinfo) e usuario logado no Windows (ultimo visto)
+garantirColuna('maquinas', 'mac', 'TEXT');
+garantirColuna('maquinas', 'usuario_logado', 'TEXT');
+garantirColuna('usuarios', 'trocar_senha', 'INTEGER NOT NULL DEFAULT 0');
+// Usuario excluido: some da lista, mas o registro fica para o historico de acessos continuar com o nome
+garantirColuna('usuarios', 'excluido_em', 'TEXT');
 
 module.exports = db;

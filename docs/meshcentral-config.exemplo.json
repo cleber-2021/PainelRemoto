@@ -18,7 +18,11 @@
     "": {
       "title": "PainelRemoto",
       "newAccounts": false,
-      "userConsentFlags": 64,
+      "userConsentFlags": 1,
+      "notificationMessages": {
+        "title": "TI",
+        "desktop": "{0}, do TI, está acessando este computador."
+      },
       "userNameIsEmail": false,
       "loginKey": ["<so letras e numeros: a mesma do mesh.loginKey do painel>"],
       "consentMessages": {
